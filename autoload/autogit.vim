@@ -1,6 +1,6 @@
 " autogit/autoload/autogit.vim
 " Core logic — lazy-loaded on first call to any autogit#* function.
-" Requires: Vim 8+ (job_start), +python3, ollama Python package.
+" Requires: Vim 8+ (job_start), +python3.
 
 " ── Module state ─────────────────────────────────────────────────────────────
 
@@ -23,7 +23,6 @@ function! autogit#ensure_server() abort
     return
   endif
 
-  echomsg '[AutoGit] Ollama not detected — starting server...'
   let s:server_job = job_start(['ollama', 'serve'], {
         \ 'out_io':  'null',
         \ 'err_io':  'null',
@@ -160,7 +159,7 @@ endfunction
 
 " ── Ollama / generation helpers ───────────────────────────────────────────────
 
-" Call Ollama via the Python ollama library.
+" Call the Ollama HTTP API directly.
 " Returns the cleaned commit message string, or '' on failure.
 function! s:generate_commit_message(filepath, file_content, diff) abort
   let l:result = ''
@@ -191,15 +190,16 @@ def _normalize(msg):
     return re.sub(r'^[^A-Za-z0-9]+', '', msg).strip()
 
 try:
-    from ollama import generate as ollama_generate
+    import json, pathlib
+    from urllib.request import urlopen, Request
 
     plugin_root  = vim.eval('s:plugin_root')
     filepath     = vim.eval('a:filepath')
     file_content = vim.eval('a:file_content')
     diff         = vim.eval('a:diff')
     model        = vim.eval('g:autogit_model')
+    host         = vim.eval('g:autogit_ollama_host').rstrip('/')
 
-    import pathlib
     prompt_path = pathlib.Path(plugin_root) / 'prompt' / 'commit_prompt.txt'
     template    = prompt_path.read_text(encoding='utf-8')
     prompt      = template.format(
@@ -208,8 +208,10 @@ try:
         diff=diff,
     )
 
-    response = ollama_generate(model=model, prompt=prompt, stream=False)
-    raw      = response['response'].strip()
+    payload = json.dumps({'model': model, 'prompt': prompt, 'stream': False}).encode('utf-8')
+    req     = Request(f'{host}/api/generate', data=payload, headers={'Content-Type': 'application/json'})
+    with urlopen(req) as r:
+        raw = json.loads(r.read().decode('utf-8'))['response'].strip()
 
     message = _extract_from_backticks(raw) or _normalize(raw)
 
