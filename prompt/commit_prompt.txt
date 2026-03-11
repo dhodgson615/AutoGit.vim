@@ -1,0 +1,20 @@
+Generate a concise, conventional-commit style commit message for the following change.
+
+File: {filepath}
+
+=== Current file content ===
+{file_content}
+
+=== Git diff ===
+{diff}
+
+Rules:
+- Use the conventional commit format: type(scope): description
+- Types: feat, fix, refactor, docs, style, test, chore
+- Keep the subject line under 72 characters
+- Use the imperative mood ("add feature", not "added feature")
+- Wrap your answer in triple backticks, e.g.:
+  ```
+  feat(auth): add OAuth2 login support
+  ```
+- Output ONLY the commit message — no explanation, no commentary.
